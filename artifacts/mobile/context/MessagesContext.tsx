@@ -18,6 +18,7 @@ export interface Message {
   encryptedContent: string;
   timestamp: string;
   isEncrypted: boolean;
+  expiresAt?: number;
 }
 
 export interface Conversation {
@@ -27,16 +28,26 @@ export interface Conversation {
   lastMessage?: string;
   lastMessageTime?: string;
   unreadCount: number;
+  ghostMode?: number | null;
 }
+
+export const GHOST_DURATIONS: { label: string; value: number | null }[] = [
+  { label: "OFF", value: null },
+  { label: "10s", value: 10_000 },
+  { label: "1 MIN", value: 60_000 },
+  { label: "1 HR", value: 3_600_000 },
+];
 
 interface MessagesContextType {
   conversations: Conversation[];
   contacts: Contact[];
   getMessages: (conversationId: string) => Message[];
-  sendMessage: (conversationId: string, content: string) => Promise<void>;
+  sendMessage: (conversationId: string, content: string, ghostDuration?: number | null) => Promise<void>;
   addContact: (username: string) => Promise<{ success: boolean; error?: string }>;
   startConversation: (contactUserId: string) => Promise<string>;
   markRead: (conversationId: string) => void;
+  setGhostMode: (conversationId: string, duration: number | null) => Promise<void>;
+  deleteMessage: (conversationId: string, messageId: string) => Promise<void>;
   refreshAll: () => Promise<void>;
 }
 
@@ -59,6 +70,11 @@ function encryptContent(content: string): string {
     if (i % 4 === 3) encrypted += " ";
   }
   return encrypted.trim();
+}
+
+function purgeExpired(msgs: Message[]): Message[] {
+  const now = Date.now();
+  return msgs.filter((m) => !m.expiresAt || m.expiresAt > now);
 }
 
 export function MessagesProvider({ children }: { children: React.ReactNode }) {
@@ -84,7 +100,12 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
       const msgEntries = await Promise.all(
         convos.map(async (c) => {
           const data = await AsyncStorage.getItem(MSGS_KEY(c.id));
-          return [c.id, data ? JSON.parse(data) : []] as [string, Message[]];
+          const raw: Message[] = data ? JSON.parse(data) : [];
+          const alive = purgeExpired(raw);
+          if (alive.length !== raw.length) {
+            await AsyncStorage.setItem(MSGS_KEY(c.id), JSON.stringify(alive));
+          }
+          return [c.id, alive] as [string, Message[]];
         })
       );
       setMessages(Object.fromEntries(msgEntries));
@@ -101,8 +122,13 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
     return messages[conversationId] ?? [];
   }, [messages]);
 
-  const sendMessage = useCallback(async (conversationId: string, content: string) => {
+  const sendMessage = useCallback(async (
+    conversationId: string,
+    content: string,
+    ghostDuration?: number | null
+  ) => {
     if (!user) return;
+    const expiresAt = ghostDuration ? Date.now() + ghostDuration : undefined;
     const msg: Message = {
       id: generateId(),
       conversationId,
@@ -111,6 +137,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
       encryptedContent: encryptContent(content),
       timestamp: new Date().toISOString(),
       isEncrypted: true,
+      expiresAt,
     };
     const existing = messages[conversationId] ?? [];
     const updated = [...existing, msg];
@@ -126,7 +153,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
       (b.lastMessageTime ?? "").localeCompare(a.lastMessageTime ?? "")
     ));
 
-    // Simulate reply
+    // Simulate reply (also ghost if ghost mode on)
     setTimeout(async () => {
       const replies = [
         "TRANSMISSION RECEIVED. Decrypting...",
@@ -141,6 +168,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
       const convo = conversations.find((c) => c.id === conversationId);
       const otherId = convo?.participantIds.find((id) => id !== user.id);
       if (!otherId) return;
+      const replyExpiresAt = ghostDuration ? Date.now() + ghostDuration : undefined;
       const replyMsg: Message = {
         id: generateId(),
         conversationId,
@@ -149,10 +177,11 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
         encryptedContent: encryptContent(replyContent),
         timestamp: new Date().toISOString(),
         isEncrypted: true,
+        expiresAt: replyExpiresAt,
       };
       const currentMsgs = await AsyncStorage.getItem(MSGS_KEY(conversationId));
       const parsedMsgs: Message[] = currentMsgs ? JSON.parse(currentMsgs) : [];
-      const withReply = [...parsedMsgs, replyMsg];
+      const withReply = [...purgeExpired(parsedMsgs), replyMsg];
       await AsyncStorage.setItem(MSGS_KEY(conversationId), JSON.stringify(withReply));
       setMessages((prev) => ({ ...prev, [conversationId]: withReply }));
     }, 1500 + Math.random() * 2000);
@@ -165,16 +194,11 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
     }
     const allUsersData = await AsyncStorage.getItem(ALL_USERS_KEY);
     const allUsers: Array<{ id: string; username: string; displayName: string; publicKey: string }> = allUsersData
-      ? JSON.parse(allUsersData)
-      : [];
+      ? JSON.parse(allUsersData) : [];
     const found = allUsers.find((u) => u.username.toLowerCase() === username.toLowerCase());
-    if (!found) {
-      return { success: false, error: "USER NOT FOUND in the network" };
-    }
+    if (!found) return { success: false, error: "USER NOT FOUND in the network" };
     const existing = contacts.find((c) => c.userId === found.id);
-    if (existing) {
-      return { success: false, error: "Contact already added" };
-    }
+    if (existing) return { success: false, error: "Contact already added" };
     const newContact: Contact = {
       id: generateId(),
       userId: found.id,
@@ -203,6 +227,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
         [contactUserId]: contact?.displayName ?? "Unknown",
       },
       unreadCount: 0,
+      ghostMode: null,
     };
     const updated = [...conversations, newConvo];
     await AsyncStorage.setItem(CONVOS_KEY(user.id), JSON.stringify(updated));
@@ -216,6 +241,22 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
+  const setGhostMode = useCallback(async (conversationId: string, duration: number | null) => {
+    if (!user) return;
+    const updated = conversations.map((c) =>
+      c.id === conversationId ? { ...c, ghostMode: duration } : c
+    );
+    await AsyncStorage.setItem(CONVOS_KEY(user.id), JSON.stringify(updated));
+    setConversations(updated);
+  }, [user, conversations]);
+
+  const deleteMessage = useCallback(async (conversationId: string, messageId: string) => {
+    const existing = messages[conversationId] ?? [];
+    const filtered = existing.filter((m) => m.id !== messageId);
+    await AsyncStorage.setItem(MSGS_KEY(conversationId), JSON.stringify(filtered));
+    setMessages((prev) => ({ ...prev, [conversationId]: filtered }));
+  }, [messages]);
+
   return (
     <MessagesContext.Provider value={{
       conversations,
@@ -225,6 +266,8 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
       addContact,
       startConversation,
       markRead,
+      setGhostMode,
+      deleteMessage,
       refreshAll: loadData,
     }}>
       {children}
