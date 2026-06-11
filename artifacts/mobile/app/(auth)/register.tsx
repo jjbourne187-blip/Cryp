@@ -27,10 +27,13 @@ export default function RegisterScreen() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const formAnim = useRef(new Animated.Value(0)).current;
+  const isWeb = Platform.OS === "web";
+  const formAnim = useRef(new Animated.Value(isWeb ? 1 : 0)).current;
 
   useEffect(() => {
-    Animated.timing(formAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
+    if (!isWeb) {
+      Animated.timing(formAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
+    }
   }, []);
 
   const handleRegister = async () => {

@@ -27,16 +27,19 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [cursor, setCursor] = useState(true);
 
-  const titleAnim = useRef(new Animated.Value(0)).current;
-  const formAnim = useRef(new Animated.Value(0)).current;
+  const isWeb = Platform.OS === "web";
+  const titleAnim = useRef(new Animated.Value(isWeb ? 1 : 0)).current;
+  const formAnim = useRef(new Animated.Value(isWeb ? 1 : 0)).current;
   const glitchAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    Animated.sequence([
-      Animated.delay(300),
-      Animated.timing(titleAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-      Animated.timing(formAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
-    ]).start();
+    if (!isWeb) {
+      Animated.sequence([
+        Animated.delay(300),
+        Animated.timing(titleAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(formAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+      ]).start();
+    }
 
     const blink = setInterval(() => setCursor((c) => !c), 500);
     return () => clearInterval(blink);
@@ -81,7 +84,7 @@ export default function LoginScreen() {
         <View style={[styles.inner, { paddingBottom: insets.bottom + 20 }]}>
           <Animated.View style={[styles.titleBlock, { opacity: titleAnim }]}>
             <Animated.Text style={[styles.title, { opacity: glitchAnim }]}>
-              MATRIX MESSENGER
+              CRYPTIC
             </Animated.Text>
             <Text style={styles.subtitle}>
               END-TO-END ENCRYPTED COMMUNICATIONS{cursor ? "_" : " "}
