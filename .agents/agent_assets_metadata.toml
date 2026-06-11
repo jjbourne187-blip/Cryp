@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "7Ode4fzRTR9TmUPebpBna"
+uri = "file://artifacts/mobile/assets/images/icon.png"
+type = "image"
+title = "matrix messenger icon"
