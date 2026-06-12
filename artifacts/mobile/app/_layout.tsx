@@ -6,22 +6,46 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
+import { ActivityIndicator, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { AuthProvider } from "@/context/AuthContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { MessagesProvider } from "@/context/MessagesContext";
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
-function RootLayoutNav() {
+function AuthGuardedNav() {
+  const { user, isLoading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isLoading) return;
+    const inAuthGroup = segments[0] === "(auth)";
+
+    if (!user && !inAuthGroup) {
+      router.replace("/(auth)/login");
+    } else if (user && inAuthGroup) {
+      router.replace("/(main)/chats");
+    }
+  }, [user, isLoading, segments]);
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#000000", alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator color="#00FF41" size="large" />
+      </View>
+    );
+  }
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
@@ -29,10 +53,7 @@ function RootLayoutNav() {
       <Stack.Screen name="(main)" />
       <Stack.Screen
         name="chat/[id]"
-        options={{
-          presentation: "card",
-          animation: "slide_from_right",
-        }}
+        options={{ presentation: "card", animation: "slide_from_right" }}
       />
     </Stack>
   );
@@ -62,7 +83,7 @@ export default function RootLayout() {
             <KeyboardProvider>
               <AuthProvider>
                 <MessagesProvider>
-                  <RootLayoutNav />
+                  <AuthGuardedNav />
                 </MessagesProvider>
               </AuthProvider>
             </KeyboardProvider>

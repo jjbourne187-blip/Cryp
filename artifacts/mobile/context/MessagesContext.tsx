@@ -48,6 +48,7 @@ interface MessagesContextType {
   markRead: (conversationId: string) => void;
   setGhostMode: (conversationId: string, duration: number | null) => Promise<void>;
   deleteMessage: (conversationId: string, messageId: string) => Promise<void>;
+  wipeAllMessages: () => Promise<void>;
   refreshAll: () => Promise<void>;
 }
 
@@ -257,6 +258,20 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
     setMessages((prev) => ({ ...prev, [conversationId]: filtered }));
   }, [messages]);
 
+  const wipeAllMessages = useCallback(async () => {
+    if (!user) return;
+    await Promise.all(conversations.map((c) => AsyncStorage.removeItem(MSGS_KEY(c.id))));
+    const wiped = conversations.map((c) => ({
+      ...c,
+      lastMessage: undefined,
+      lastMessageTime: undefined,
+      unreadCount: 0,
+    }));
+    await AsyncStorage.setItem(CONVOS_KEY(user.id), JSON.stringify(wiped));
+    setConversations(wiped);
+    setMessages({});
+  }, [user, conversations]);
+
   return (
     <MessagesContext.Provider value={{
       conversations,
@@ -268,6 +283,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
       markRead,
       setGhostMode,
       deleteMessage,
+      wipeAllMessages,
       refreshAll: loadData,
     }}>
       {children}
