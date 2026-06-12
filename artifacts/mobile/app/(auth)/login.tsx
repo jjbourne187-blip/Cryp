@@ -69,6 +69,7 @@ export default function LoginScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.replace("/(main)/chats");
     }
   };
 
