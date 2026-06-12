@@ -18,7 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function LoginScreen() {
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const insets = useSafeAreaInsets();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -26,6 +26,13 @@ export default function LoginScreen() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [cursor, setCursor] = useState(true);
+
+  // Redirect as soon as user is set (handles both login and already-logged-in)
+  useEffect(() => {
+    if (user) {
+      router.replace("/(main)/chats");
+    }
+  }, [user]);
 
   const isWeb = Platform.OS === "web";
   const titleAnim = useRef(new Animated.Value(isWeb ? 1 : 0)).current;

@@ -18,7 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function RegisterScreen() {
-  const { register } = useAuth();
+  const { register, user } = useAuth();
   const insets = useSafeAreaInsets();
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
@@ -26,6 +26,13 @@ export default function RegisterScreen() {
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Redirect as soon as user is set after registration
+  useEffect(() => {
+    if (user) {
+      router.replace("/(main)/chats");
+    }
+  }, [user]);
 
   const isWeb = Platform.OS === "web";
   const formAnim = useRef(new Animated.Value(isWeb ? 1 : 0)).current;
