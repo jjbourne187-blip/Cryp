@@ -2,6 +2,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useMessages } from "@/context/MessagesContext";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import QRCode from "react-native-qrcode-svg";
 import React, { useRef, useState } from "react";
 import {
   Alert,
@@ -150,6 +151,28 @@ export default function ProfileScreen() {
             <View style={[styles.onlineDot, { backgroundColor: colors.primary }]} />
             <Text style={[styles.onlineText, { color: colors.primary }]}>ONLINE · SECURE</Text>
           </View>
+        </View>
+
+        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>MY QR CODE</Text>
+        <View style={[styles.qrCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.qrHint, { color: colors.mutedForeground }]}>
+            Let others scan this to add you instantly
+          </Text>
+          <View style={[styles.qrWrapper, { borderColor: colors.border }]}>
+            <View style={{ backgroundColor: "#fff", padding: 8, borderRadius: 2 }}>
+              <QRCode
+                value={JSON.stringify({
+                  cryptic: "1",
+                  u: user?.username ?? "",
+                  d: user?.displayName ?? "",
+                })}
+                size={160}
+                color="#000000"
+                backgroundColor="#ffffff"
+              />
+            </View>
+          </View>
+          <Text style={[styles.qrUsername, { color: colors.primary }]}>@{user?.username}</Text>
         </View>
 
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>ENCRYPTION SPECS</Text>
@@ -364,6 +387,26 @@ const styles = StyleSheet.create({
   },
   infoLabel: { fontSize: 11, fontFamily: "monospace" },
   infoValue: { fontSize: 11, fontFamily: "monospace", flex: 1, textAlign: "right" },
+  qrCard: {
+    borderRadius: 4,
+    borderWidth: 1,
+    padding: 16,
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 4,
+  },
+  qrHint: { fontSize: 11, fontFamily: "monospace", textAlign: "center" },
+  qrWrapper: {
+    borderRadius: 4,
+    borderWidth: 1,
+    padding: 4,
+  },
+  qrUsername: {
+    fontSize: 14,
+    fontFamily: "monospace",
+    fontWeight: "bold" as const,
+    letterSpacing: 2,
+  },
   panicCard: {
     borderRadius: 4,
     borderWidth: 1,

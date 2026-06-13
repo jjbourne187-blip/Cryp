@@ -55,6 +55,10 @@ function AuthGuardedNav() {
         name="chat/[id]"
         options={{ presentation: "card", animation: "slide_from_right" }}
       />
+      <Stack.Screen
+        name="qr-scan"
+        options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }}
+      />
     </Stack>
   );
 }

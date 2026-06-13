@@ -61,12 +61,20 @@ export default function ContactsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: paddingTop + 12, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>NETWORK NODES</Text>
-        <TouchableOpacity
-          onPress={() => { setShowAdd(!showAdd); setAddError(""); setAddSuccess(""); }}
-          style={[styles.addBtn, { borderColor: showAdd ? colors.primary : colors.border, backgroundColor: colors.card }]}
-        >
-          <Feather name={showAdd ? "x" : "user-plus"} size={18} color={colors.primary} />
-        </TouchableOpacity>
+        <View style={styles.headerBtns}>
+          <TouchableOpacity
+            onPress={() => router.push("/qr-scan")}
+            style={[styles.addBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
+          >
+            <Feather name="maximize" size={18} color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => { setShowAdd(!showAdd); setAddError(""); setAddSuccess(""); }}
+            style={[styles.addBtn, { borderColor: showAdd ? colors.primary : colors.border, backgroundColor: colors.card }]}
+          >
+            <Feather name={showAdd ? "x" : "user-plus"} size={18} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {showAdd && (
@@ -166,6 +174,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
+  headerBtns: { flexDirection: "row", gap: 8 },
   headerTitle: {
     fontSize: 20,
     fontWeight: "bold" as const,
