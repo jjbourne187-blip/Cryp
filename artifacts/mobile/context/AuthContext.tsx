@@ -1,5 +1,14 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import {
+  apiLogin,
+  apiLogout,
+  apiRegister,
+  apiGetMe,
+  saveToken,
+  clearToken,
+  type ApiUser,
+} from "@/lib/api";
 
 export interface User {
   id: string;
@@ -7,10 +16,6 @@ export interface User {
   displayName: string;
   publicKey: string;
   createdAt: string;
-}
-
-interface StoredUser extends User {
-  password: string;
 }
 
 interface AuthContextType {
@@ -22,35 +27,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
-
-const USERS_KEY = "matrix_users";
-const SESSION_KEY = "matrix_session";
-
-function generateId(): string {
-  return Date.now().toString() + Math.random().toString(36).substr(2, 9);
-}
-
-function generatePublicKey(): string {
-  const chars = "0123456789abcdef";
-  let key = "0x";
-  for (let i = 0; i < 40; i++) {
-    key += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return key;
-}
-
-async function getStoredUsers(): Promise<StoredUser[]> {
-  try {
-    const data = await AsyncStorage.getItem(USERS_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
-  }
-}
-
-async function saveUsers(users: StoredUser[]): Promise<void> {
-  await AsyncStorage.setItem(USERS_KEY, JSON.stringify(users));
-}
+const SESSION_KEY = "cryptic_token";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -59,18 +36,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const sessionData = await AsyncStorage.getItem(SESSION_KEY);
-        if (sessionData) {
-          const session = JSON.parse(sessionData);
-          const users = await getStoredUsers();
-          const found = users.find((u) => u.id === session.userId);
-          if (found) {
-            const { password: _pw, ...safeUser } = found;
-            setUser(safeUser);
-          }
+        const token = await AsyncStorage.getItem(SESSION_KEY);
+        if (token) {
+          const me = await apiGetMe();
+          setUser(me);
         }
       } catch {
-        // ignore
+        await clearToken();
       } finally {
         setIsLoading(false);
       }
@@ -78,51 +50,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {
-    const users = await getStoredUsers();
-    const found = users.find(
-      (u) => u.username.toLowerCase() === username.toLowerCase() && u.password === password
-    );
-    if (!found) {
-      return { success: false, error: "ACCESS DENIED: Invalid credentials" };
+    try {
+      const { token, user: apiUser } = await apiLogin(username, password);
+      await saveToken(token);
+      setUser(apiUser);
+      return { success: true };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Login failed";
+      return { success: false, error: msg };
     }
-    const { password: _pw, ...safeUser } = found;
-    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify({ userId: found.id }));
-    setUser(safeUser);
-    return { success: true };
   }, []);
 
   const register = useCallback(async (username: string, password: string, displayName: string) => {
     if (!username.trim() || !password.trim() || !displayName.trim()) {
       return { success: false, error: "All fields required" };
     }
-    if (username.length < 3) {
-      return { success: false, error: "Username must be at least 3 characters" };
+    try {
+      const { token, user: apiUser } = await apiRegister(username, password, displayName);
+      await saveToken(token);
+      setUser(apiUser);
+      return { success: true };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Registration failed";
+      return { success: false, error: msg };
     }
-    if (password.length < 6) {
-      return { success: false, error: "Password must be at least 6 characters" };
-    }
-    const users = await getStoredUsers();
-    const exists = users.find((u) => u.username.toLowerCase() === username.toLowerCase());
-    if (exists) {
-      return { success: false, error: "USERNAME TAKEN: Identity already registered" };
-    }
-    const newUser: StoredUser = {
-      id: generateId(),
-      username: username.trim(),
-      displayName: displayName.trim(),
-      password,
-      publicKey: generatePublicKey(),
-      createdAt: new Date().toISOString(),
-    };
-    await saveUsers([...users, newUser]);
-    const { password: _pw, ...safeUser } = newUser;
-    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify({ userId: newUser.id }));
-    setUser(safeUser);
-    return { success: true };
   }, []);
 
   const logout = useCallback(async () => {
-    await AsyncStorage.removeItem(SESSION_KEY);
+    await apiLogout();
     setUser(null);
   }, []);
 

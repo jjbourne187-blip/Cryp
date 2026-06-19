@@ -26,7 +26,7 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
-  const { conversations, getMessages, sendMessage, markRead, setGhostMode, deleteMessage } = useMessages();
+  const { conversations, getMessages, sendMessage, markRead, setGhostMode, deleteMessage, pollMessages, stopPolling } = useMessages();
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [showGhostPicker, setShowGhostPicker] = useState(false);
@@ -42,8 +42,12 @@ export default function ChatScreen() {
     : "Chat";
 
   useEffect(() => {
-    if (id) markRead(id);
-  }, [id, messages.length]);
+    if (id) {
+      markRead(id);
+      pollMessages(id);
+      return () => stopPolling();
+    }
+  }, [id]);
 
   const toggleGhostPicker = () => {
     const opening = !showGhostPicker;
