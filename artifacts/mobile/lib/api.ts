@@ -2,6 +2,14 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
 const TOKEN_KEY = "cryptic_token";
+const REQUEST_TIMEOUT_MS = 15_000;
+
+export class ApiRequestError extends Error {
+  constructor(message: string, readonly status?: number) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
 
 function getBase(): string {
   if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -34,15 +42,31 @@ async function request<T>(
     const token = await getToken();
     if (token) headers["Authorization"] = `Bearer ${token}`;
   }
-  const res = await fetch(`${getBase()}${path}`, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`${getBase()}${path}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new ApiRequestError("The server took too long to respond. Check your connection and try again.");
+    }
+    const message = err instanceof Error ? err.message : "";
+    throw new ApiRequestError(
+      message || "Unable to reach the server. Check your connection and try again."
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;
     try { const j = await res.json(); msg = j.error ?? msg; } catch {}
-    throw new Error(msg);
+    throw new ApiRequestError(msg, res.status);
   }
   return res.json() as Promise<T>;
 }

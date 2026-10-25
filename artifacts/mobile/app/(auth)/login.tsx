@@ -135,6 +135,16 @@ export default function LoginScreen() {
               </Pressable>
             </View>
 
+            <TouchableOpacity
+              onPress={() => router.push("/(auth)/forgot-password")}
+              style={styles.forgotLink}
+              accessibilityRole="button"
+              accessibilityLabel="Forgot password"
+            >
+              <Text style={styles.forgotLinkText}>FORGOT PASSWORD?</Text>
+              <Feather name="arrow-right" size={13} color="#00FF41" />
+            </TouchableOpacity>
+
             {!!error && (
               <View style={styles.errorBlock}>
                 <Feather name="alert-triangle" size={12} color="#FF0040" />
@@ -251,6 +261,19 @@ const styles = StyleSheet.create({
   },
   passwordInput: { paddingRight: 0 },
   eyeBtn: { padding: 12 },
+  forgotLink: {
+    alignSelf: "flex-end",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 10,
+  },
+  forgotLinkText: {
+    color: "#00FF41",
+    fontSize: 10,
+    fontFamily: "monospace",
+    letterSpacing: 1,
+  },
   errorBlock: {
     flexDirection: "row",
     alignItems: "center",

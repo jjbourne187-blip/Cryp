@@ -7,6 +7,7 @@ import {
   apiGetMe,
   saveToken,
   clearToken,
+  ApiRequestError,
   type ApiUser,
 } from "@/lib/api";
 
@@ -41,8 +42,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const me = await apiGetMe();
           setUser(me);
         }
-      } catch {
-        await clearToken();
+      } catch (err) {
+        // Keep a valid saved session when the server is temporarily unreachable.
+        // Only discard credentials when the server explicitly rejects the token.
+        if (err instanceof ApiRequestError && err.status === 401) {
+          await clearToken();
+        }
       } finally {
         setIsLoading(false);
       }
